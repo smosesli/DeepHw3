@@ -18,11 +18,14 @@ def char_maps(text: str):
         represented by it. The reverse of the above map.
 
     """
-    # TODO: Create two maps as described in the docstring above.
+    # DONE: Create two maps as described in the docstring above.
     # It's best if you also sort the chars before assigning indices, so that
     # they're in lexical order.
     # ====== YOUR CODE: ======
-    raise NotImplementedError()
+    chars = sorted(list(set(text)))
+    idx = [i for i in range(len(chars))]
+    char_to_idx = {k: v for k, v in zip(chars, idx)}
+    idx_to_char = {v: k for k, v in char_to_idx.items()}
     # ========================
     return char_to_idx, idx_to_char
 
@@ -38,7 +41,9 @@ def remove_chars(text: str, chars_to_remove):
     """
     # TODO: Implement according to the docstring.
     # ====== YOUR CODE: ======
-    raise NotImplementedError()
+
+    regexp = '|'.join(chars_to_remove)
+    text_clean, n_removed = re.subn(regexp, '', text)
     # ========================
     return text_clean, n_removed
 
@@ -47,7 +52,7 @@ def chars_to_onehot(text: str, char_to_idx: dict) -> Tensor:
     """
     Embed a sequence of chars as a a tensor containing the one-hot encoding
     of each char. A one-hot encoding means that each char is represented as
-    a tensor of zeros with a single '1' element at the index in the tesnsor
+    a tensor of zeros with a single '1' element at the index in the tensor
     corresponding to the index of that char.
     :param text: The text to embed.
     :param char_to_idx: Mapping from each char in the sequence to it's
@@ -56,9 +61,12 @@ def chars_to_onehot(text: str, char_to_idx: dict) -> Tensor:
     and D is the number of unique chars in the sequence. The dtype of the
     returned tensor will be torch.int8.
     """
-    # TODO: Implement the embedding.
+    # DONE: Implement the embedding.
     # ====== YOUR CODE: ======
-    raise NotImplementedError()
+    N = len(text)
+    D = len(char_to_idx)
+    idx = torch.LongTensor([char_to_idx[i] for i in text])
+    result = torch.zeros([N, D], dtype=torch.int8).scatter_(1, idx.view(-1, 1), 1)
     # ========================
     return result
 
@@ -73,9 +81,11 @@ def onehot_to_chars(embedded_text: Tensor, idx_to_char: dict) -> str:
     :return: A string containing the text sequence represented by the
     embedding.
     """
-    # TODO: Implement the reverse-embedding.
+    # DONE: Implement the reverse-embedding.
     # ====== YOUR CODE: ======
-    raise NotImplementedError()
+    idx_tensor = torch.nonzero(embedded_text)
+    idx_list = idx_tensor[:, 1].numpy().tolist()
+    result = ''.join([idx_to_char[i] for i in idx_list])
     # ========================
     return result
 
@@ -104,7 +114,13 @@ def chars_to_labelled_samples(text: str, char_to_idx: dict, seq_len: int,
     # 3. Create the labels tensor in a similar way and convert to indices.
     # Note that no explicit loops are required to implement this function.
     # ====== YOUR CODE: ======
-    raise NotImplementedError()
+    num_seq = (len(text) - 1) // seq_len
+    numel = num_seq * seq_len
+    embeded_text = chars_to_onehot(text[:numel], char_to_idx)
+    # embeded_text = embeded_text.permute(1, 0)
+    samples = torch.reshape(embeded_text, (num_seq, seq_len, -1))
+    embeded_labels = torch.LongTensor([char_to_idx[i] for i in text[1:numel + 1]])
+    labels = torch.reshape(embeded_labels, (num_seq, seq_len))
     # ========================
     return samples, labels
 
