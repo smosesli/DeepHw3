@@ -198,7 +198,7 @@ class MultilayerGRU(nn.Module):
         self.out_dim = out_dim
         self.h_dim = h_dim
         self.n_layers = n_layers
-        self.layer_params = []
+        self.layer_params = nn.ModuleList()
 
         # TODO: Create the parameters of the model.
         # To implement the affine transforms you can use either nn.Linear
@@ -216,7 +216,14 @@ class MultilayerGRU(nn.Module):
         #     then call self.register_parameter() on them. Also make
         #     sure to initialize them. See functions in torch.nn.init.
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        self.layer_params += [torch.nn.Linear(in_dim, h_dim)]*3
+        self.layer_params += [torch.nn.Linear(h_dim, h_dim, bias=False)]*3
+        for i in range(n_layers-1):
+            self.layer_params += [torch.nn.Linear(h_dim, h_dim)]*3 + [torch.nn.Linear(h_dim, h_dim, bias=False)]*3
+        #self.layer_params = nn.ModuleList()
+        #for l, module_list in enumerate(self.layer_params):
+
+        self.output_layer = torch.nn.Linear(h_dim, out_dim)
         # ========================
 
     def forward(self, input: Tensor, hidden_state: Tensor=None):
@@ -234,6 +241,8 @@ class MultilayerGRU(nn.Module):
         The hidden_state tensor is the final hidden state, per layer, of shape
         (B, L, H) as above.
         """
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        input = input.to(device)
         batch_size, seq_len, _ = input.shape
 
         layer_states = []
@@ -251,6 +260,21 @@ class MultilayerGRU(nn.Module):
         # Tip: You can use torch.stack() to combine multiple tensors into a
         # single tensor in a differentiable manner.
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        x = [layer_input[:, t, :] for t in range(seq_len)]  # x is list of S tensors, each BxV
+        hidden_state_list = []
+        #for l, (w_xz, w_xr, w_xg, w_hz, w_hr, w_hg) in enumerate(self.layer_params):
+        for l in range(len(self.layer_params)//6):
+            w_xz, w_xr, w_xg, w_hz, w_hr, w_hg = self.layer_params[6*l:6*l+6]
+            h_prev = layer_states[l]
+            for t in range(seq_len):
+                z = torch.sigmoid(w_xz(x[t]) + w_hz(h_prev))
+                r = torch.sigmoid(w_xr(x[t]) + w_hr(h_prev))
+                g = F.tanh(w_xg(x[t]) + w_hg(r*h_prev))
+                h_prev = z * h_prev + (1 - z) * g
+                x[t] = h_prev
+            hidden_state_list.append(h_prev)
+        x_stack = torch.stack(x, dim=-2)
+        layer_output = self.output_layer(x_stack)
+        hidden_state = torch.stack(hidden_state_list, dim=-2)
         # ========================
         return layer_output, hidden_state
