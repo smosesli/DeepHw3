@@ -136,7 +136,9 @@ def hot_softmax(y, dim=0, temperature=1.0):
     """
     # TODO: Implement based on the above.
     # ====== YOUR CODE: ======
-    raise NotImplementedError()
+    # y and results shape = (B x string_len x num_unique_chars)
+    hot_y = y * (1/temperature)
+    result = torch.exp(hot_y) / torch.sum(torch.exp(hot_y), dim=dim)
     # ========================
     return result
 
@@ -172,7 +174,21 @@ def generate_from_model(model, start_sequence, n_chars, char_maps, T):
     # necessary for this. Best to disable tracking for speed.
     # See torch.no_grad().
     # ====== YOUR CODE: ======
-    raise NotImplementedError()
+    input_tensor = chars_to_onehot(start_sequence, char_to_idx).unsqueeze(dim=0).float()
+    print(f'input_tensor.shape={input_tensor.shape}')
+    print(f'input_tensor.dtype={input_tensor.dtype}')
+    with torch.no_grad():
+        y, h = model(input_tensor)  # y shape is (B, string_len, num_unique_chars)
+        prob = hot_softmax(y[-1, :], temperature=T)
+        pred = torch.multinomial(prob, 1)
+        pred_one_hot = torch.zeros([y.shape[-1], 1], dtype=torch.int8).scatter_(1, pred.view(-1, 1), 1)
+        out_text += onehot_to_chars(pred_one_hot, idx_to_char)
+        for idx in range(n_chars-len(start_sequence)):
+            y, h = model(pred_one_hot, h)
+            prob = hot_softmax(y, temperature=T)
+            pred = torch.multinomial(prob, 1)
+            pred_one_hot = torch.zeros([y.shape[-1], 1], dtype=torch.int8).scatter_(1, pred.view(-1, 1), 1)
+            out_text += onehot_to_chars(pred_one_hot, idx_to_char)
     # ========================
 
     return out_text
@@ -198,7 +214,12 @@ class MultilayerGRU(nn.Module):
         self.out_dim = out_dim
         self.h_dim = h_dim
         self.n_layers = n_layers
-        self.layer_params = nn.ModuleList()
+        self.xz_params = nn.ModuleList()
+        self.hz_params = nn.ModuleList()
+        self.xr_params = nn.ModuleList()
+        self.hr_params = nn.ModuleList()
+        self.xg_params = nn.ModuleList()
+        self.hg_params = nn.ModuleList()
 
         # TODO: Create the parameters of the model.
         # To implement the affine transforms you can use either nn.Linear
@@ -216,12 +237,19 @@ class MultilayerGRU(nn.Module):
         #     then call self.register_parameter() on them. Also make
         #     sure to initialize them. See functions in torch.nn.init.
         # ====== YOUR CODE: ======
-        self.layer_params += [torch.nn.Linear(in_dim, h_dim)]*3
-        self.layer_params += [torch.nn.Linear(h_dim, h_dim, bias=False)]*3
+        self.xz_params.append(torch.nn.Linear(in_dim, h_dim))
+        self.xr_params.append(torch.nn.Linear(in_dim, h_dim))
+        self.xg_params.append(torch.nn.Linear(in_dim, h_dim))
+        self.hz_params.append(torch.nn.Linear(h_dim, h_dim, bias=False))
+        self.hr_params.append(torch.nn.Linear(h_dim, h_dim, bias=False))
+        self.hg_params.append(torch.nn.Linear(h_dim, h_dim, bias=False))
         for i in range(n_layers-1):
-            self.layer_params += [torch.nn.Linear(h_dim, h_dim)]*3 + [torch.nn.Linear(h_dim, h_dim, bias=False)]*3
-        #self.layer_params = nn.ModuleList()
-        #for l, module_list in enumerate(self.layer_params):
+            self.xz_params.append(torch.nn.Linear(h_dim, h_dim))
+            self.xr_params.append(torch.nn.Linear(h_dim, h_dim))
+            self.xg_params.append(torch.nn.Linear(h_dim, h_dim))
+            self.hz_params.append(torch.nn.Linear(h_dim, h_dim, bias=False))
+            self.hr_params.append(torch.nn.Linear(h_dim, h_dim, bias=False))
+            self.hg_params.append(torch.nn.Linear(h_dim, h_dim, bias=False))
 
         self.output_layer = torch.nn.Linear(h_dim, out_dim)
         # ========================
@@ -262,14 +290,18 @@ class MultilayerGRU(nn.Module):
         # ====== YOUR CODE: ======
         x = [layer_input[:, t, :] for t in range(seq_len)]  # x is list of S tensors, each BxV
         hidden_state_list = []
-        #for l, (w_xz, w_xr, w_xg, w_hz, w_hr, w_hg) in enumerate(self.layer_params):
-        for l in range(len(self.layer_params)//6):
-            w_xz, w_xr, w_xg, w_hz, w_hr, w_hg = self.layer_params[6*l:6*l+6]
+        for l in range(self.n_layers):
+            w_xz = self.xz_params[l]
+            w_xr = self.xr_params[l]
+            w_xg = self.xg_params[l]
+            w_hz = self.hz_params[l]
+            w_hr = self.hr_params[l]
+            w_hg = self.hg_params[l]
             h_prev = layer_states[l]
             for t in range(seq_len):
                 z = torch.sigmoid(w_xz(x[t]) + w_hz(h_prev))
                 r = torch.sigmoid(w_xr(x[t]) + w_hr(h_prev))
-                g = F.tanh(w_xg(x[t]) + w_hg(r*h_prev))
+                g = torch.tanh(w_xg(x[t]) + w_hg(r*h_prev))
                 h_prev = z * h_prev + (1 - z) * g
                 x[t] = h_prev
             hidden_state_list.append(h_prev)
