@@ -136,9 +136,9 @@ def hot_softmax(y, dim=0, temperature=1.0):
     """
     # TODO: Implement based on the above.
     # ====== YOUR CODE: ======
-    # y and results shape = (B x string_len x num_unique_chars)
-    hot_y = y * (1/temperature)
-    result = torch.exp(hot_y) / torch.sum(torch.exp(hot_y), dim=dim)
+    # y and results shape = (num_unique_chars)
+    hot_y = torch.exp(y * (1/temperature))
+    result = torch.div(hot_y, torch.sum(hot_y, dim=dim))
     # ========================
     return result
 
@@ -174,20 +174,21 @@ def generate_from_model(model, start_sequence, n_chars, char_maps, T):
     # necessary for this. Best to disable tracking for speed.
     # See torch.no_grad().
     # ====== YOUR CODE: ======
-    input_tensor = chars_to_onehot(start_sequence, char_to_idx).unsqueeze(dim=0).float()
-    print(f'input_tensor.shape={input_tensor.shape}')
-    print(f'input_tensor.dtype={input_tensor.dtype}')
+    input_tensor = chars_to_onehot(start_sequence, char_to_idx).unsqueeze(dim=0).float().to(device)
     with torch.no_grad():
-        y, h = model(input_tensor)  # y shape is (B, string_len, num_unique_chars)
-        prob = hot_softmax(y[-1, :], temperature=T)
-        pred = torch.multinomial(prob, 1)
-        pred_one_hot = torch.zeros([y.shape[-1], 1], dtype=torch.int8).scatter_(1, pred.view(-1, 1), 1)
+        y, h = model(input_tensor)  # y shape is (1, string_len, num_unique_chars)
+        prob = hot_softmax(y[-1, -1, :], temperature=T)  # prob shape = (num_unique_chars=79)
+        pred = torch.multinomial(prob, 1)  # pred shape is (1)
+        pred_one_hot = torch.zeros([1, y.shape[-1]], dtype=torch.int8)
+        pred_one_hot[:, pred.item()] = 1
         out_text += onehot_to_chars(pred_one_hot, idx_to_char)
-        for idx in range(n_chars-len(start_sequence)):
-            y, h = model(pred_one_hot, h)
-            prob = hot_softmax(y, temperature=T)
-            pred = torch.multinomial(prob, 1)
-            pred_one_hot = torch.zeros([y.shape[-1], 1], dtype=torch.int8).scatter_(1, pred.view(-1, 1), 1)
+        for idx in range(n_chars-len(start_sequence)-1):
+            y, h = model(pred_one_hot.unsqueeze(dim=0).float().to(device), h)
+            prob = hot_softmax(y[-1, -1, :], temperature=T)
+            pred = torch.multinomial(prob, 1)  # pred shape is (1)
+
+            pred_one_hot = torch.zeros([1, y.shape[-1]], dtype=torch.int8)
+            pred_one_hot[:, pred.item()] = 1
             out_text += onehot_to_chars(pred_one_hot, idx_to_char)
     # ========================
 
@@ -270,6 +271,7 @@ class MultilayerGRU(nn.Module):
         (B, L, H) as above.
         """
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        #device = torch.device("cpu")
         input = input.to(device)
         batch_size, seq_len, _ = input.shape
 
@@ -309,4 +311,5 @@ class MultilayerGRU(nn.Module):
         layer_output = self.output_layer(x_stack)
         hidden_state = torch.stack(hidden_state_list, dim=-2)
         # ========================
+        #layer_output = torch.sigmoid(layer_output)
         return layer_output, hidden_state
