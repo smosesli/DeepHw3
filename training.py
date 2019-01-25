@@ -33,6 +33,7 @@ class Trainer(abc.ABC):
         self.optimizer = optimizer
         self.device = device
         model.to(self.device)
+        self.hidden_state = None
 
     def fit(self, dl_train: DataLoader, dl_test: DataLoader,
             num_epochs, checkpoints: str = None,
@@ -56,7 +57,7 @@ class Trainer(abc.ABC):
         actual_num_epochs = 0
         train_loss, train_acc, test_loss, test_acc = [], [], [], []
 
-        best_acc = None
+        best_acc = -1
         epochs_without_improvement = 0
 
         checkpoint_filename = None
@@ -72,6 +73,7 @@ class Trainer(abc.ABC):
                     saved_state.get('ewi', epochs_without_improvement)
                 self.model.load_state_dict(saved_state['model_state'])
 
+        prev_loss = None
         for epoch in range(num_epochs):
             save_checkpoint = False
             verbose = False  # pass this to train/test_epoch.
@@ -85,7 +87,28 @@ class Trainer(abc.ABC):
             # - Implement early stopping. This is a very useful and
             #   simple regularization technique that is highly recommended.
             # ====== YOUR CODE: ======
-            raise NotImplementedError()
+            train_result = self.train_epoch(dl_train=dl_train, verbose=verbose)
+            train_loss.extend(train_result.losses)
+            train_acc.append(train_result.accuracy)
+            test_result = self.test_epoch(dl_test=dl_test, verbose=verbose)
+            test_loss.extend(test_result.losses)
+            test_acc.append(test_result.accuracy)
+
+            curr_loss = sum(test_result.losses) / len(test_result.losses)
+
+            actual_num_epochs += 1
+            if best_acc < test_result.accuracy:
+                best_acc = test_result.accuracy
+                save_checkpoint = True
+
+            if not prev_loss or curr_loss < prev_loss:
+                epochs_without_improvement = 0
+                prev_loss = curr_loss
+            else:
+                epochs_without_improvement += 1
+
+            if early_stopping and epochs_without_improvement > early_stopping:
+                    break
             # ========================
 
             # Save model checkpoint if requested
@@ -207,13 +230,14 @@ class RNNTrainer(Trainer):
     def train_epoch(self, dl_train: DataLoader, **kw):
         # TODO: Implement modifications to the base method, if needed.
         # ====== YOUR CODE: ======
+        self.hidden_state = None
         # ========================
         return super().train_epoch(dl_train, **kw)
 
     def test_epoch(self, dl_test: DataLoader, **kw):
         # TODO: Implement modifications to the base method, if needed.
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        self.hidden_state = None
         # ========================
         return super().test_epoch(dl_test, **kw)
 
@@ -231,13 +255,15 @@ class RNNTrainer(Trainer):
         # - Calculate number of correct char predictions
         # ====== YOUR CODE: ======
         self.optimizer.zero_grad()
-        pred, h = self.model.forward(x)  # (B,S,V), (B, num_layers, h_dim)
+        pred, self.hidden_state = self.model.forward(x, self.hidden_state)  # (B,S,V), (B, num_layers, h_dim)
         pred = pred.permute(0, 2, 1)
         y_pred = torch.argmax(pred, dim=-2)  # (B,S)
         loss = self.loss_fn(pred, y)
         loss.backward()
         self.optimizer.step()
         num_correct = torch.sum(y == y_pred)
+
+        self.hidden_state.detach_()
         # ========================
 
         # Note: scaling num_correct by seq_len because each sample has seq_len
@@ -256,7 +282,11 @@ class RNNTrainer(Trainer):
             # - Loss calculation
             # - Calculate number of correct predictions
             # ====== YOUR CODE: ======
-            raise NotImplementedError()
+            pred, self.hidden_state = self.model.forward(x, self.hidden_state)  # (B,S,V), (B, num_layers, h_dim)
+            pred = pred.permute(0, 2, 1)
+            y_pred = torch.argmax(pred, dim=-2)  # (B,S)
+            loss = self.loss_fn(pred, y)
+            num_correct = torch.sum(y == y_pred)
             # ========================
 
         return BatchResult(loss.item(), num_correct.item() / seq_len)

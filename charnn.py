@@ -42,7 +42,7 @@ def remove_chars(text: str, chars_to_remove):
     # TODO: Implement according to the docstring.
     # ====== YOUR CODE: ======
 
-    regexp = '|'.join(chars_to_remove)
+    regexp = re.compile('[{}]'.format(''.join(re.escape(i) for i in chars_to_remove)))
     text_clean, n_removed = re.subn(regexp, '', text)
     # ========================
     return text_clean, n_removed
@@ -83,9 +83,8 @@ def onehot_to_chars(embedded_text: Tensor, idx_to_char: dict) -> str:
     """
     # DONE: Implement the reverse-embedding.
     # ====== YOUR CODE: ======
-    idx_tensor = torch.nonzero(embedded_text)
-    idx_list = idx_tensor[:, 1].numpy().tolist()
-    result = ''.join([idx_to_char[i] for i in idx_list])
+    idx_tensor = torch.nonzero(embedded_text)[:, 1]
+    result = ''.join(idx_to_char[i.item()] for i in idx_tensor)
     # ========================
     return result
 
@@ -116,10 +115,10 @@ def chars_to_labelled_samples(text: str, char_to_idx: dict, seq_len: int,
     # ====== YOUR CODE: ======
     num_seq = (len(text) - 1) // seq_len
     numel = num_seq * seq_len
-    embeded_text = chars_to_onehot(text[:numel], char_to_idx)
+    embeded_text = chars_to_onehot(text[:numel], char_to_idx).to(device)
     # embeded_text = embeded_text.permute(1, 0)
     samples = torch.reshape(embeded_text, (num_seq, seq_len, -1))
-    embeded_labels = torch.LongTensor([char_to_idx[i] for i in text[1:numel + 1]])
+    embeded_labels = torch.LongTensor([char_to_idx[i] for i in text[1:numel + 1]]).to(device)
     labels = torch.reshape(embeded_labels, (num_seq, seq_len))
     # ========================
     return samples, labels
@@ -137,8 +136,7 @@ def hot_softmax(y, dim=0, temperature=1.0):
     # TODO: Implement based on the above.
     # ====== YOUR CODE: ======
     # y and results shape = (num_unique_chars)
-    hot_y = torch.exp(y * (1/temperature))
-    result = torch.div(hot_y, torch.sum(hot_y, dim=dim))
+    result = F.softmax(y / temperature, dim=dim)
     # ========================
     return result
 
@@ -174,8 +172,8 @@ def generate_from_model(model, start_sequence, n_chars, char_maps, T):
     # necessary for this. Best to disable tracking for speed.
     # See torch.no_grad().
     # ====== YOUR CODE: ======
-    input_tensor = chars_to_onehot(start_sequence, char_to_idx).unsqueeze(dim=0).float().to(device)
     with torch.no_grad():
+        input_tensor = chars_to_onehot(start_sequence, char_to_idx).unsqueeze(dim=0).float().to(device)
         y, h = model(input_tensor)  # y shape is (1, string_len, num_unique_chars)
         prob = hot_softmax(y[-1, -1, :], temperature=T)  # prob shape = (num_unique_chars=79)
         pred = torch.multinomial(prob, 1)  # pred shape is (1)
@@ -271,7 +269,7 @@ class MultilayerGRU(nn.Module):
         (B, L, H) as above.
         """
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        #device = torch.device("cpu")
+        # device = torch.device("cpu")
         input = input.to(device)
         batch_size, seq_len, _ = input.shape
 
