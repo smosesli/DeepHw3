@@ -19,53 +19,32 @@ def part1_generation_params():
 
 part1_q1 = r"""
 **Your answer:**
-
-
-Write your answer using **markdown** and $\LaTeX$:
-```python
-# A code block
-a = 2
-```
-An equation: $e^{i\pi} -1 = 0$
-
+We want to use the GPU which has a limited memory. so we cannot load the entire corpus.
 """
 
 part1_q2 = r"""
 **Your answer:**
-
-
-Write your answer using **markdown** and $\LaTeX$:
-```python
-# A code block
-a = 2
-```
-An equation: $e^{i\pi} -1 = 0$
-
+We save the hidden state between sequences. During the training we also save the hidden state between batches. 
 """
 
 part1_q3 = r"""
 **Your answer:**
-
-
-Write your answer using **markdown** and $\LaTeX$:
-```python
-# A code block
-a = 2
-```
-An equation: $e^{i\pi} -1 = 0$
-
+We want the model to learn how to generate text in any size, not limited to seq_len. We want the generated text to
+be learned according to the entire corpus with its logical order, shuffling will ruin this order.
 """
 
 part1_q4 = r"""
 **Your answer:**
+1. The temperature affects the variance of the predicted chars distribution. The higher the temperature the more 
+uniform the distribution gets. When sampling, we would prefer to control the distributions and make them less uniform to
+increase the chance of sampling the char(s) with the highest scores compared to the others.
+During training we would like the distribution to be more uniform to allow for wide range of possibilities.
 
+2. The text looks like it was drawn from a uniform distribution. It basically looks like some one tried giving a monkey
+a keyboard.
 
-Write your answer using **markdown** and $\LaTeX$:
-```python
-# A code block
-a = 2
-```
-An equation: $e^{i\pi} -1 = 0$
+3. The text has less mistakes and looks very similar to the text in the train set. It is basically looks like someone 
+referenced from the original text.     
 
 """
 # ==============
