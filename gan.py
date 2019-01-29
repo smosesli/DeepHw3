@@ -28,9 +28,9 @@ class Discriminator(nn.Module):
         filters = (in_size[0], 64, 128, 256, 512)
         for i, (in_filters, out_filters) in enumerate(zip(filters, filters[1:]), start=1):
             modules.append(nn.Conv2d(in_filters, out_filters, kernel_size=kernel_size, stride=stride, padding=stride))
+            modules.append(nn.LeakyReLU(negative_slope=0.2))
             if i is not 1:
                 modules.append(nn.BatchNorm2d(out_filters))
-            modules.append(nn.LeakyReLU(negative_slope=0.2))
         self.cnn = nn.Sequential(*modules)
         self.affine = nn.Linear(filters[-1]*4*4, 1)
         # ========================
@@ -71,15 +71,15 @@ class Generator(nn.Module):
         self.fm_size = featuremap_size
         kernel_size = (5, 5)
         stride = (2, 2)
-        self.filters = (1024, 512, 256, 128, out_channels)
+        self.filters = (512, 256, 128, 64, out_channels)
         modules = []
         self.affine = nn.Linear(z_dim, self.filters[0] * self.fm_size * self.fm_size)
         for i, (in_filters, out_filters) in enumerate(zip(self.filters, self.filters[1:]), start=1):
             modules.append(nn.ConvTranspose2d(in_filters, out_filters, kernel_size=kernel_size,
                                               stride=stride, padding=stride, output_padding=(1, 1)))
             if i is not len(self.filters):
-                modules.append(nn.BatchNorm2d(out_filters))
                 modules.append(nn.ReLU())
+                modules.append(nn.BatchNorm2d(out_filters))
             else:
                 modules.append(nn.Tanh())
         self.cnn = nn.Sequential(*modules)

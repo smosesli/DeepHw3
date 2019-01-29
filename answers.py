@@ -59,7 +59,7 @@ PART2_CUSTOM_DATA_URL = None
 def part2_vae_hyperparams():
     hypers = dict(
         batch_size=16,
-        h_dim=512, z_dim=4, x_sigma2=1,
+        h_dim=512, z_dim=32, x_sigma2=2,
         learn_rate=1e-4, betas=(0.9, 0.999),
     )
     # TODO: Tweak the hyperparameters to generate a former president.
@@ -70,14 +70,9 @@ def part2_vae_hyperparams():
 
 part2_q1 = r"""
 **Your answer:**
-
-
-Write your answer using **markdown** and $\LaTeX$:
-```python
-# A code block
-a = 2
-```
-An equation: $e^{i\pi} -1 = 0$
+This hyper-parameter controls the variation of the generated samples. Low sigma will result in samples that are very
+similar to the input data, this is a trade off between how rich the new data that the network produces and between how
+similar the data is to the original. High sigma will result in much more erroneous data
 
 """
 
@@ -92,15 +87,15 @@ PART3_CUSTOM_DATA_URL = None
 def part3_gan_hyperparams():
     hypers = dict(
         batch_size=32, z_dim=100,
-        data_label=1, label_noise=0.6,
+        data_label=1, label_noise=0.3,
         discriminator_optimizer=dict(
             type='Adam',  # Any name in nn.optim like SGD, Adam
-            lr=0.0002,
+            lr=0.002,
             betas=(0.5, 0.999),
         ),
         generator_optimizer=dict(
             type='Adam',  # Any name in nn.optim like SGD, Adam
-            lr=0.0002,
+            lr=0.0004,
             betas=(0.5, 0.999),
         ),
     )
@@ -111,44 +106,32 @@ def part3_gan_hyperparams():
 
 
 part3_q1 = r"""
-**Your answer:**
+When training the discriminator we create samples from the generator. 
+However we don't want the gradients to back-propagate to the generator, thus we do two things:
+1) We create the generated images with grad 
+2) We detach the samples from the generators graph before feeding it to the discriminator.
 
-
-Write your answer using **markdown** and $\LaTeX$:
-```python
-# A code block
-a = 2
-```
-An equation: $e^{i\pi} -1 = 0$
+When we train the generator we don't want to detach the generated samples because we want to train the generator using
+ the discriminator.
 
 """
 
 part3_q2 = r"""
 **Your answer:**
-
-
-Write your answer using **markdown** and $\LaTeX$:
-```python
-# A code block
-a = 2
-```
-An equation: $e^{i\pi} -1 = 0$
+1)No, We also depent on the performance of the discriminator. for example: if the discriminator always produces one we
+ will get zero loss .
+2)It means that the discriminator learned faster than the generator
 
 """
 
 part3_q3 = r"""
 **Your answer:**
-
-
-Write your answer using **markdown** and $\LaTeX$:
-```python
-# A code block
-a = 2
-```
-An equation: $e^{i\pi} -1 = 0$
+We can see that the VAE learned faster and gave results that are all very similar to each other. But also it was more
+human like
+The GAN was much harder to train but each result looked very different from each other. but the results also looks less
+human then the VAE
 
 """
 
 # ==============
-
 
