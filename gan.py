@@ -16,7 +16,7 @@ class Discriminator(nn.Module):
         """
         super().__init__()
         self.in_size = in_size
-        # TODO: Create the discriminator model layers.
+        # DONE: Create the discriminator model layers.
         # To extract image features you can use the EncoderCNN from the VAE
         # section or implement something new.
         # You can then use either an affine layer or another conv layer to

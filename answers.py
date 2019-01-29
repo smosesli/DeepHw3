@@ -72,7 +72,7 @@ part2_q1 = r"""
 **Your answer:**
 This hyper-parameter controls the variation of the generated samples. Low sigma will result in samples that are very
 similar to the input data, this is a trade off between how rich the new data that the network produces and between how
-similar the data is to the original. High sigma will result in much more erroneous data
+similar the data is to the original. High sigma will result in much more erroneous data.
 
 """
 
